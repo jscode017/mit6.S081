@@ -41,9 +41,9 @@ ifeq ($(LAB),pgtbl)
 OBJS += $K/vmcopyin.o
 endif
 
-# riscv64-unknown-elf- or riscv64-linux-gnu-
+# riscv64-unknown-elf- or riscv64-linux-gnu-riscv64-unknown-elf-
 # perhaps in /opt/riscv/bin
-#TOOLPREFIX = 
+TOOLPREFIX = /usr/local/Cellar/riscv-gnu-toolchain/master/bin/riscv64-unknown-elf-
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
@@ -149,6 +149,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_trace\
 
 
 

@@ -106,7 +106,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
-
+  p->traceMask=0;
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     release(&p->lock);
@@ -273,6 +273,9 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
+  np->traceMask=p->traceMask;
+
   np->sz = p->sz;
 
   np->parent = p;
