@@ -86,6 +86,11 @@ void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
 
 // proc.c
+pagetable_t     prockvminit(void);
+void            prockvmmap(pagetable_t ,uint64, uint64, uint64, int);
+void 			pagetable_copy(pagetable_t, pagetable_t);
+void  			procfreewalk(pagetable_t);
+void proc_freekpagetable(pagetable_t);
 int             cpuid(void);
 void            exit(int);
 int             fork(void);
@@ -223,3 +228,7 @@ int             sockread(struct sock *, uint64, int);
 int             sockwrite(struct sock *, uint64, int);
 void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
 #endif
+
+//vmcopyin.c
+int				copyin_new(pagetable_t, char *, uint64, uint64);
+int				copyinstr_new(pagetable_t, char *, uint64, uint64);
