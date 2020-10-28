@@ -59,6 +59,21 @@ printptr(uint64 x)
     consputc(digits[x >> (sizeof(uint64) * 8 - 4)]);
 }
 
+//list function calls above
+void
+backtrace(){
+	uint64 fp=r_fp();
+	for(;;){
+		printf("%p\n",*(uint64 *)(fp-8));
+		uint64 prevfp;
+		prevfp=fp-16;
+		if (*((uint64 *)prevfp)+16>PGROUNDUP(fp)){
+			break;
+		}
+		fp=*(uint64 *)prevfp;
+	}
+}
+
 // Print to the console. only understands %d, %x, %p, %s.
 void
 printf(char *fmt, ...)
@@ -71,8 +86,10 @@ printf(char *fmt, ...)
   if(locking)
     acquire(&pr.lock);
 
-  if (fmt == 0)
+  if (fmt == 0){
+	backtrace();
     panic("null fmt");
+  }
 
   va_start(ap, fmt);
   for(i = 0; (c = fmt[i] & 0xff) != 0; i++){
