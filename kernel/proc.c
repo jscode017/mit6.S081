@@ -127,6 +127,12 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->ticks_elapse=0;
+  p->processing_alarm=0;
+  if((p->saved_tf_for_alarm = (struct trapframe *)kalloc()) == 0){
+      release(&p->lock);
+      return 0;
+   }
   return p;
 }
 
