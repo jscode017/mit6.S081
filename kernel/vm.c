@@ -183,7 +183,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+      continue;
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -440,3 +440,29 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+void
+vmprint(pagetable_t pagetable,uint64 depth)
+{
+	if (depth==1){
+		printf("page table %p\n",pagetable);
+	}
+	for(int i = 0; i < 512; i++){
+	    pte_t pte = pagetable[i];
+	    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+	      // this PTE points to a lower-level page table.
+	      for(int j=0;j<depth;j++){
+	    	  printf(".. ");
+	      }
+	      uint64 child = PTE2PA(pte);
+	      printf("%d: pte %p pa %p\n",i,pte,child);
+	      vmprint((pagetable_t)child,depth+1);
+	    } else if(pte & PTE_V){
+	    	for(int j=0;j<depth;j++){
+	    		printf(".. ");
+	    	}
+	    	printf("%d: pte %p pa %p\n",i,pte,PTE2PA(pte));
+	    }
+	  }
+}
+
