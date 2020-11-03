@@ -5,7 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
-
+#include "spinlock.h"
+#include "proc.h"
 /*
  * the kernel's page table.
  */
@@ -181,7 +182,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      continue;
     if((*pte & PTE_V) == 0)
       continue;
     if(PTE_FLAGS(*pte) == PTE_V)
@@ -315,9 +316,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -465,4 +466,28 @@ vmprint(pagetable_t pagetable,uint64 depth)
 	    }
 	  }
 }
+uint64
+lazyallocate(uint64 va){
+	struct proc *p = myproc();
+	if (va>p->sz){
+	  goto lz_alloc_error;
+	}
+    uint64 stack_pointer=p->trapframe->sp;
+    if (va<stack_pointer){ //below guard page
+      goto lz_alloc_error;
+	}
+	char *mem;
+	mem = kalloc();
+	if (mem==0){
+	  goto lz_alloc_error;
+	}
+	memset(mem, 0, PGSIZE);
+	if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+	  kfree(mem);
+	  return -2;
+	}
+	return 0;
+	lz_alloc_error:
+	  return -1;
 
+}

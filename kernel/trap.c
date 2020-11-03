@@ -59,21 +59,62 @@ usertrap(void)
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
     p->trapframe->epc += 4;
-
+    int num;
+    num = p->trapframe->a7;
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
     intr_on();
-
-    syscall();
+    uint64 syscall_va;
+    if (num==5 || num==7 || num==8 || num==16){
+    	if(argaddr(1,&syscall_va)<0){
+    		 p->trapframe->a0 = -1;
+    	}
+    }else if(num==4){
+    	if(argaddr(0,&syscall_va)<0){
+    		 p->trapframe->a0 = -1;
+    	}
+    }
+    int proc_syscall=1;
+    if(walkaddr(p->pagetable, syscall_va)==0){
+    	if(lazyallocate(syscall_va)<0){
+    		p->trapframe->a0 = -1;
+    		proc_syscall=0;
+        }
+    }
+    if(proc_syscall){
+    	syscall();
+    }
   } else if(r_scause()==13 || r_scause()==15){
 	  uint64 pf_va=r_stval();
+	  if (pf_va>p->sz){
+		  p->killed=1;
+		  exit(-1);
+	  }
+	  uint64 stack_pointer=p->trapframe->sp;
+	  if (pf_va<stack_pointer){ //below guard page
+		  p->killed=1;
+		  exit(-1);
+	  }
 	  char *mem;
 	  mem = kalloc();
+	  if (mem==0){
+		  p->killed=1;
+		  exit(-1);
+	  }
 	  memset(mem, 0, PGSIZE);
-	  if(mappages(myproc()->pagetable, PGROUNDDOWN(pf_va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+	  if(mappages(p->pagetable, PGROUNDDOWN(pf_va), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
 		kfree(mem);
+		//if p->killed=1, qemu would hang (TODO?)
 	    exit(-1);
 	  }
+	 /*uint64 ret_val;
+	 if((ret_val=lazyallocate(pf_va))<0){
+		  if (ret_val==-1){
+			  p->killed=1;
+		  }else if(ret_val==-2){
+			  exit(-1);
+		  }
+	  }*/
   }else if((which_dev = devintr()) != 0){
 	    // ok
   } else {

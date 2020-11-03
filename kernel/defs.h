@@ -155,6 +155,7 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+uint64			lazyallocate(uint64);
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);
