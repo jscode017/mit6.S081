@@ -10,7 +10,7 @@ struct spinlock tickslock;
 uint ticks;
 
 extern char trampoline[], uservec[], userret[];
-
+extern int page_ref_cnt[32768];
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -67,7 +67,11 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else if(r_scause() == 13 || r_scause() == 15){
+	  if(cow_pg_fault(p->pagetable,r_stval())<0){
+	    p->killed=1;
+	  }
+  }else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -82,7 +86,44 @@ usertrap(void)
 
   usertrapret();
 }
+int
+cow_pg_fault(pagetable_t page_table,uint64 va)
+{
+	pte_t *pte;
+	uint64 pa;
+	uint flags;
+	char *mem;
+	struct proc *p=myproc();
+	if(va>MAXVA){
+	  return -1;
+	}
+	va=PGROUNDDOWN(va);
+	if((pte = walk(page_table, va, 0)) == 0)
+	  return -1;
+	//if((*pte & PTE_V) == 0)
+	  //panic("uvmcopy: page not present");
+	if ((*pte & PTE_COW)==0){
+	  exit(-1);
+	}
 
+	pa = PTE2PA(*pte);
+	flags = PTE_FLAGS(*pte);
+	if((mem = kalloc()) == 0){
+	  p->killed=1;
+	  exit(-1);
+	}
+	memmove(mem, (void*)pa, PGSIZE);
+	uvmunmap(page_table,va,1,1);
+	if(mappages(page_table, va, PGSIZE, (uint64)mem, (flags | PTE_W) & ~PTE_COW) != 0){
+	  goto err;
+	}
+
+	return 0;
+
+	err:
+	  uvmunmap(page_table, va, 1, 1);
+	  return -1;
+}
 //
 // return to user space
 //
@@ -142,8 +183,11 @@ kerneltrap()
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
     panic("kerneltrap: interrupts enabled");
-
-  if((which_dev = devintr()) == 0){
+  if(scause==13 || scause==15){
+    if(cow_pg_fault(myproc()->pagetable,r_stval())<0){
+      panic("kerneltrap cow_pg_fault");
+    }
+  }else if((which_dev = devintr()) == 0){
     printf("scause %p\n", scause);
     printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
     panic("kerneltrap");

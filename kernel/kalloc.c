@@ -17,7 +17,7 @@ extern char end[]; // first address after kernel.
 struct run {
   struct run *next;
 };
-
+int page_ref_cnt[32768]; //128*1024*1024/4096
 struct {
   struct spinlock lock;
   struct run *freelist;
@@ -50,9 +50,14 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
-
+  if (page_ref_cnt[((uint64)pa/4096)%32768]>0){
+    page_ref_cnt[((uint64)pa/4096)%32768]--;
+    if(page_ref_cnt[((uint64)pa/4096)%32768]>0){
+        return;
+    }
+  }
   // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
+  memset(pa, 0, PGSIZE);
 
   r = (struct run*)pa;
 
@@ -77,6 +82,8 @@ kalloc(void)
   release(&kmem.lock);
 
   if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
+    memset((char*)r, 0, PGSIZE); // fill with junk
+  if(r && (uint64)r>=KERNBASE && (uint64)r<PHYSTOP)
+    page_ref_cnt[((uint64)r/4096)%32768]=1;
   return (void*)r;
 }

@@ -142,6 +142,7 @@ void            syscall();
 // trap.c
 extern uint     ticks;
 void            trapinit(void);
+int             cow_pg_fault(pagetable_t,uint64);
 void            trapinithart(void);
 extern struct spinlock tickslock;
 void            usertrapret(void);
@@ -153,7 +154,8 @@ void            uartputc(int);
 void            uartputc_sync(int);
 int             uartgetc(void);
 
-// vm.c
+//vm.c
+pte_t *         walk(pagetable_t, uint64, int);
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);
