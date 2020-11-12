@@ -159,7 +159,6 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if(*pte & PTE_V)
       panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
-    //page_ref_cnt[(pa/4096)%32768]++;
     if(a == last)
       break;
     a += PGSIZE;
@@ -188,7 +187,6 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     uint64 pa = PTE2PA(*pte);
-    //page_ref_cnt[(pa/4096)%32768]--;
     if(do_free){
       kfree((void*)pa);
     }
@@ -245,7 +243,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     }
     memset(mem, 0, PGSIZE);
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-      page_ref_cnt[((uint64)mem/4096)%32768]++;
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
       return 0;
@@ -334,7 +331,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
           goto err;
     }
     page_ref_cnt[(pa/4096)%32768]++;
-    //printf("cnt %d %d\n",(pa/4096)%32768, page_ref_cnt[(pa/4096)%32768]);
     /*if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);*/

@@ -50,6 +50,9 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+  if (page_ref_cnt[((uint64)pa/4096)%32768]<0){
+    return;
+  }
   if (page_ref_cnt[((uint64)pa/4096)%32768]>0){
     page_ref_cnt[((uint64)pa/4096)%32768]--;
     if(page_ref_cnt[((uint64)pa/4096)%32768]>0){
@@ -57,7 +60,7 @@ kfree(void *pa)
     }
   }
   // Fill with junk to catch dangling refs.
-  memset(pa, 0, PGSIZE);
+  memset(pa, 5, PGSIZE);
 
   r = (struct run*)pa;
 
