@@ -102,11 +102,11 @@ cow_pg_fault(pagetable_t page_table,uint64 va)
 	  return -1;
 	//if((*pte & PTE_V) == 0)
 	  //panic("uvmcopy: page not present");
+  pa = PTE2PA(*pte);
 	if ((*pte & PTE_COW)==0){
 	  exit(-1);
 	}
 
-	pa = PTE2PA(*pte);
 	flags = PTE_FLAGS(*pte);
 	if((mem = kalloc()) == 0){
 	  p->killed=1;
@@ -115,6 +115,8 @@ cow_pg_fault(pagetable_t page_table,uint64 va)
 	memmove(mem, (void*)pa, PGSIZE);
 	uvmunmap(page_table,va,1,1);
 	if(mappages(page_table, va, PGSIZE, (uint64)mem, (flags | PTE_W) & ~PTE_COW) != 0){
+	  kfree((void *)pa);
+	  kfree((void *)mem);
 	  goto err;
 	}
 

@@ -316,6 +316,12 @@ grade:
           (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
 	./grade-lab-$(LAB) $(GRADEFLAGS)
 
+
+##
+##for gdb
+##
+gdb:
+	riscv64-unknown-elf-gdb kernel/kernel
 ##
 ## FOR web handin
 ##

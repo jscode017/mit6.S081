@@ -17,6 +17,7 @@ extern char end[]; // first address after kernel.
 struct run {
   struct run *next;
 };
+struct spinlock page_ref_lock;
 int page_ref_cnt[32768]; //128*1024*1024/4096
 struct {
   struct spinlock lock;
@@ -35,8 +36,9 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE){
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -50,20 +52,23 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+  acquire(&page_ref_lock);
   if (page_ref_cnt[((uint64)pa/4096)%32768]<0){
+    release(&page_ref_lock);
     return;
   }
   if (page_ref_cnt[((uint64)pa/4096)%32768]>0){
     page_ref_cnt[((uint64)pa/4096)%32768]--;
     if(page_ref_cnt[((uint64)pa/4096)%32768]>0){
-        return;
+      release(&page_ref_lock);
+      return;
     }
   }
   // Fill with junk to catch dangling refs.
   memset(pa, 5, PGSIZE);
 
   r = (struct run*)pa;
-
+  release(&page_ref_lock);
   acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
@@ -86,7 +91,10 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 0, PGSIZE); // fill with junk
-  if(r && (uint64)r>=KERNBASE && (uint64)r<PHYSTOP)
+  if(r && (uint64)r>=KERNBASE && (uint64)r<PHYSTOP){
+    acquire(&page_ref_lock);
     page_ref_cnt[((uint64)r/4096)%32768]=1;
+    release(&page_ref_lock);
+  }
   return (void*)r;
 }
