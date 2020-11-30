@@ -466,6 +466,7 @@ itrunc(struct inode *ip)
             bfree(ip->dev, a2[j]);
         }
         brelse(bp2);
+        bfree(ip->dev,a[i]);
       }
     }
     brelse(bp);
