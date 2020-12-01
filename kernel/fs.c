@@ -378,7 +378,7 @@ static uint
 bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
-  struct buf *bp,*bp2;
+  struct buf *bp;
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
@@ -387,7 +387,7 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < INDIRECTSIZE){
+  if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
@@ -401,25 +401,25 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
-  bn -= INDIRECTSIZE;
-  if (bn<256*INDIRECTSIZE){
+  bn -= NINDIRECT;
+  if (bn<NINDIRECT*NINDIRECT){
     if((addr = ip->addrs[NDIRECT+1]) == 0)
           ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
         bp = bread(ip->dev, addr);
         a = (uint*)bp->data;
-        int indirect_layer1=bn/INDIRECTSIZE;
+        int indirect_layer1=bn/NINDIRECT;
         if((addr = a[indirect_layer1]) == 0){
           a[indirect_layer1] = addr = balloc(ip->dev);
           log_write(bp);
         }
-        bp2=bread(ip->dev,addr);
-        a=(uint*)bp2->data;
-        if((addr=a[bn%INDIRECTSIZE])==0){
-          a[bn%INDIRECTSIZE] = addr = balloc(ip->dev);
-          log_write(bp2);
+        brelse(bp);
+        bp=bread(ip->dev,addr);
+        a=(uint*)bp->data;
+        if((addr=a[bn%NINDIRECT])==0){
+          a[bn%NINDIRECT] = addr = balloc(ip->dev);
+          log_write(bp);
         }
         brelse(bp);
-        brelse(bp2);
         return addr;
   }
 
@@ -457,16 +457,16 @@ itrunc(struct inode *ip)
   if(ip->addrs[NDIRECT+1]){
     bp = bread(ip->dev, ip->addrs[NDIRECT+1]);
     a = (uint*)bp->data;
-    for(int i=0;i<INDIRECTSIZE;i++){
-      if(a[i]){
-        bp2=bread(ip->dev,a[i]);
+    for(int j=0;j<NINDIRECT;j++){
+      if(a[j]){
+        bp2=bread(ip->dev,a[j]);
         a2=(uint*)bp2->data;
-        for(j = 0; j < INDIRECTSIZE; j++){
-          if(a2[j])
-            bfree(ip->dev, a2[j]);
+        for(int k = 0; k < NINDIRECT; k++){
+          if(a2[k])
+            bfree(ip->dev, a2[k]);
         }
         brelse(bp2);
-        bfree(ip->dev,a[i]);
+        bfree(ip->dev,a[j]);
       }
     }
     brelse(bp);
