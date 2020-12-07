@@ -65,6 +65,35 @@ usertrap(void)
     intr_on();
 
     syscall();
+  }else if(r_scause()==13 || r_scause()==15){
+    printf("kernel trap page fault\n");
+    uint64 pf_va=r_stval();
+    int i=0;
+    for(;i<VMANUM;i++){
+      if (p->vmas[i].address==pf_va){
+        break;
+      }
+    }
+    if(i==VMANUM){
+      panic("page fault");
+    }
+    //uint64 address=p->vmas[i].address;
+    /*uint offset=p->vmas[i].offset,length=p->vmas[i].length;
+    //int prot=p->vmas[i].prot;
+    struct file *f=p->vmas[i].f;*/
+    uint length=p->vmas[i].length;
+    int oldsize=pf_va,newsize=pf_va+length;
+    for(;oldsize<newsize;oldsize+=PGSIZE){
+      char *mem;
+      mem = kalloc();
+      memset(mem, 0, PGSIZE);
+      struct proc *p=myproc();
+      if(mappages(p->pagetable, oldsize,PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+        kfree(mem);
+        exit(-1);
+      }
+    }
+    read_file4mmap(p->vmas[i]);
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

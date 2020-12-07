@@ -20,11 +20,17 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "fcntl.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
 // only one device
 struct superblock sb; 
+
+extern struct {
+  struct spinlock lock;
+  struct file file[NFILE];
+} ftable;
 
 // Read the super block.
 static void
@@ -671,4 +677,30 @@ struct inode*
 nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
+}
+void read_file4mmap(struct vma _vma){
+  struct file *f=_vma.f;
+  uint64 address=_vma.address;
+  uint offset=_vma.offset,length=_vma.length;
+  ilock(f->ip);
+  readi(f->ip,1,address,offset,length);
+  iunlock(f->ip);
+}
+void dec_file_ref(struct vma _vma){
+  acquire(&ftable.lock);
+  _vma.f->ref--;
+  release(&ftable.lock);
+}
+void mmap_writeback(struct vma _vma){
+  if(_vma.flags==MAP_SHARED){
+    begin_op();
+    ilock(_vma.f->ip);
+    if(writei(_vma.f->ip,1,_vma.address,_vma.offset,_vma.length)<0){
+      iunlock(_vma.f->ip);
+      panic("writei falied in mmap_writeback\n");
+      end_op();
+    }
+    iunlock(_vma.f->ip);
+    end_op();
+  }
 }

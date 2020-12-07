@@ -22,6 +22,7 @@ static void freeproc(struct proc *p);
 extern char trampoline[]; // trampoline.S
 
 
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -351,6 +352,12 @@ exit(int status)
       fileclose(f);
       p->ofile[fd] = 0;
     }
+  }
+  for(int i=0;i<VMANUM;i++){
+    struct vma _vma=p->vmas[i];
+    mmap_writeback(_vma);
+    uvmunmap(p->pagetable,_vma.address,_vma.length/PGSIZE,1);
+    dec_file_ref(_vma);
   }
 
   begin_op();

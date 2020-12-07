@@ -16,6 +16,11 @@
 #include "file.h"
 #include "fcntl.h"
 
+extern struct {
+  struct spinlock lock;
+  struct file file[NFILE];
+} ftable;
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -484,3 +489,127 @@ sys_pipe(void)
   }
   return 0;
 }
+uint64 sys_mmap(void){
+  uint64 addr;
+  struct file *f;
+  int fd;
+  int length,prot,flags,offset;
+  if(argaddr(0,&addr)<0){
+    return -1;
+  }
+
+
+  if(argfd(4, &fd, &f) < 0)
+    return -1;
+  if(argint(1,&length)<0 || argint(2,&prot)<0 || argint(3,&flags)<0 || argint(5,&offset)<0){
+    return -1;
+  }
+  if((prot & PROT_WRITE) && !f->writable && flags == MAP_SHARED)
+      return -1;
+  acquire(&ftable.lock);
+  if(f->ref < 1)
+    panic("filedup");
+  f->ref++;
+  release(&ftable.lock);
+  struct proc *p=myproc();
+  int i;
+  for(i=0;i<VMANUM;i++){
+    if(!p->vmas[i].used){
+      break;
+    }
+  }
+  if(i==VMANUM) panic("insufficient vmas");
+
+  p->vmas[i].used=1;
+  p->vmas[i].f=f;
+  p->vmas[i].fd=fd;
+  p->vmas[i].length=length;
+  p->vmas[i].flags=flags;
+  p->vmas[i].prot=prot;
+  p->vmas[i].offset=offset;
+  p->vmas[i].address=p->sz;
+  p->sz+=length;
+  return p->vmas[i].address;
+}
+#define DELETE_ALL 1
+#define DELETE_FROM_START 2
+#define DELETE_FROM_END 3
+int findvma_index(uint64 address,uint length){
+ struct proc *p=myproc();
+ int i=0;
+ for(;i<VMANUM;i++){
+   struct vma _vma=p->vmas[i];
+   if (_vma.address<= address && _vma.address+length>address){
+     return i;
+   }
+ }
+ return -1;
+}
+
+int getmunmap_delete_type(struct vma _vma,uint64 address, uint length){
+  if (_vma.address==address){
+    if(_vma.length==length){
+      return DELETE_ALL;
+    }else{
+      return DELETE_FROM_START;
+    }
+  }else{
+    return DELETE_FROM_END;
+  }
+}
+void unmap(struct vma _vma,uint64 address,uint length){
+  struct proc *p=myproc();
+  uvmunmap(p->pagetable,address,length/PGSIZE,1);
+}
+uint64 munmap(uint64 address,uint length){
+  int vma_index;
+  struct proc *p=myproc();
+
+  if((vma_index=findvma_index(address,length))<0) return -1;
+  struct vma _vma=p->vmas[vma_index];
+
+
+  int delete_type=getmunmap_delete_type(_vma,address,length);
+
+  if(_vma.flags==MAP_SHARED){
+    begin_op();
+    ilock(_vma.f->ip);
+    if(writei(_vma.f->ip,1,address,_vma.offset+address-_vma.address,length)<0){
+      iunlock(_vma.f->ip);
+      end_op();
+      return -1;
+    }
+    iunlock(_vma.f->ip);
+    end_op();
+  }
+
+  unmap(_vma,address,length);
+
+  switch(delete_type){
+    case DELETE_ALL:
+      acquire(&ftable.lock);
+      p->vmas[vma_index].f->ref--;
+      release(&ftable.lock);
+      p->vmas[vma_index].used=0;
+      p->vmas[vma_index].f=0;
+      break;
+    case DELETE_FROM_START:
+      p->vmas[vma_index].address=address+length;
+      p->vmas[vma_index].length=_vma.length-length;
+      break;
+    case DELETE_FROM_END:
+      p->vmas[vma_index].length=(uint)(address-_vma.address);
+      break;
+  }
+  return 0;
+}
+uint64 sys_munmap(void){ //munmap(addr, length)
+  uint64 address;
+  int length;
+  if(argaddr(0,&address)<0 || argint(1,&length)<0) return -1;
+
+  return munmap(address,length);
+}
+
+
+

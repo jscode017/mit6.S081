@@ -8,6 +8,8 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct vma;
+#define VMANUM 16
 
 // bio.c
 void            binit(void);
@@ -53,6 +55,9 @@ int             readi(struct inode*, int, uint64, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
+void read_file4mmap(struct vma);
+void dec_file_ref(struct vma);
+void mmap_writeback(struct vma);
 
 // ramdisk.c
 void            ramdiskinit(void);

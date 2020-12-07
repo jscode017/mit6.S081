@@ -16,11 +16,11 @@
 #include "spinlock.h"
 #include "sleeplock.h"
 #include "fs.h"
-#include "file.h"
 #include "memlayout.h"
 #include "riscv.h"
 #include "defs.h"
 #include "proc.h"
+#include "file.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
