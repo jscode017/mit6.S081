@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -263,6 +264,7 @@ growproc(int n)
 
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
+
 int
 fork(void)
 {
@@ -296,6 +298,14 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  //copy vma
+  for(int i=0;i<VMANUM;i++){
+    struct vma src_vma=p->vmas[i];
+    if(!src_vma.used) continue;
+
+    copy_vma(src_vma,&np->vmas[i]);
+  }
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -355,8 +365,12 @@ exit(int status)
   }
   for(int i=0;i<VMANUM;i++){
     struct vma _vma=p->vmas[i];
-    mmap_writeback(_vma);
-    uvmunmap(p->pagetable,_vma.address,_vma.length/PGSIZE,1);
+    if(!_vma.used) continue;
+
+    if(_vma.read){
+      mmap_writeback(_vma);
+      uvmunmap(p->pagetable,_vma.address,_vma.length/PGSIZE,1);
+    }
     dec_file_ref(_vma);
   }
 

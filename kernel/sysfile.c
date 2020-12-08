@@ -529,6 +529,7 @@ uint64 sys_mmap(void){
   p->vmas[i].offset=offset;
   p->vmas[i].address=p->sz;
   p->sz+=length;
+  p->vmas[i].read=0;
   return p->vmas[i].address;
 }
 #define DELETE_ALL 1

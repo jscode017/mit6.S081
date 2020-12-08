@@ -91,6 +91,7 @@ struct vma{
   int flags;
   int fd;
   struct file *f;
+  int read;
 };
 // Per-process state
 struct proc {

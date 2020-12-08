@@ -704,3 +704,20 @@ void mmap_writeback(struct vma _vma){
     end_op();
   }
 }
+void copy_vma(struct vma src,struct vma *dst){
+  dst->used=1;
+  dst->address=src.address;
+  dst->length=src.length;
+  dst->offset=src.offset;
+  dst->prot=src.prot;
+  dst->flags=src.flags;
+  dst->fd=src.fd;
+  dst->f=src.f;
+  dst->read=0;
+  inc_file_ref(*dst);
+}
+void inc_file_ref(struct vma _vma){
+  acquire(&ftable.lock);
+  _vma.f->ref++;
+  release(&ftable.lock);
+}

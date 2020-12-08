@@ -57,7 +57,9 @@ int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
 void read_file4mmap(struct vma);
 void dec_file_ref(struct vma);
+void inc_file_ref(struct vma);
 void mmap_writeback(struct vma);
+void copy_vma(struct vma,struct vma*);
 
 // ramdisk.c
 void            ramdiskinit(void);

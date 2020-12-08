@@ -66,23 +66,29 @@ usertrap(void)
 
     syscall();
   }else if(r_scause()==13 || r_scause()==15){
-    printf("kernel trap page fault\n");
+    printf("user trap page fault\n");
     uint64 pf_va=r_stval();
+    uint64 sp = p->trapframe->sp;
+    if(pf_va<sp){
+      p->killed=1;
+      exit(-1);
+    }
     int i=0;
     for(;i<VMANUM;i++){
-      if (p->vmas[i].address==pf_va){
+      struct vma _vma=p->vmas[i];
+      if (_vma.address<=pf_va && _vma.address+_vma.length>pf_va){
         break;
       }
     }
     if(i==VMANUM){
-      panic("page fault");
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+      exit(-1);
     }
-    //uint64 address=p->vmas[i].address;
-    /*uint offset=p->vmas[i].offset,length=p->vmas[i].length;
-    //int prot=p->vmas[i].prot;
-    struct file *f=p->vmas[i].f;*/
+
     uint length=p->vmas[i].length;
-    int oldsize=pf_va,newsize=pf_va+length;
+    int oldsize=p->vmas[i].address,newsize=oldsize+length;
     for(;oldsize<newsize;oldsize+=PGSIZE){
       char *mem;
       mem = kalloc();
@@ -94,6 +100,7 @@ usertrap(void)
       }
     }
     read_file4mmap(p->vmas[i]);
+    p->vmas[i].read=1;
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
